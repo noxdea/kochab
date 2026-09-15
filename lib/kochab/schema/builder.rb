@@ -57,9 +57,10 @@ module Kochab
         maximum: nil, items: nil, deprecated: false, children: [], item: nil)
         path = field_path(name)
         raise ArgumentError, "Duplicate field #{path.join(".")}" if @rules.any? { |rule| rule.field.path == path }
+        validate_metadata(description, deprecated, minimum, maximum)
 
         field = Field.new(path: Schema.frozen_copy(path), type: type, default: default.equal?(UNSET) ? nil : Schema.frozen_copy(default),
-          description: description, enum: enum && Schema.frozen_copy(enum), minimum: minimum, maximum: maximum,
+          description: description && Schema.frozen_copy(description), enum: enum && Schema.frozen_copy(enum), minimum: minimum, maximum: maximum,
           items: items, deprecated: deprecated).freeze
         @rules << Schema.rule(field, type, children: children, item: item,
           constraints: {minimum: minimum, maximum: maximum, enum: field.enum}, default_set: !default.equal?(UNSET))
@@ -75,6 +76,16 @@ module Kochab
         raise ArgumentError, "a schema block is required" unless block
 
         block.arity.zero? ? builder.instance_eval(&block) : block.call(builder)
+      end
+
+      def validate_metadata(description, deprecated, minimum, maximum)
+        raise TypeError, "description must be a String" unless description.nil? || description.is_a?(String)
+        raise TypeError, "deprecated must be true or false" unless [true, false].include?(deprecated)
+        {minimum: minimum, maximum: maximum}.each do |name, value|
+          next if value.nil? || value.is_a?(Numeric) && (!value.respond_to?(:finite?) || value.finite?)
+
+          raise TypeError, "#{name} must be a finite Numeric"
+        end
       end
     end
   end

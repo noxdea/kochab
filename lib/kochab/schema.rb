@@ -19,11 +19,9 @@ module Kochab
 
     def self.from_json_schema(hash)
       raise TypeError, "JSON Schema must be a Hash" unless hash.is_a?(Hash)
-      root_type = hash["type"] || ("object" if hash.key?("properties") || hash.key?("additionalProperties"))
-      raise ArgumentError, "JSON Schema root must be an object" unless root_type == "object"
 
       compiler = JsonCompiler.new(hash)
-      root = compiler.compile(hash, [])
+      root = compiler.compile_root
       new(root)
     end
 
@@ -134,15 +132,18 @@ module Kochab
         (rule.additional.is_a?(Rule) ? collect_fields(rule.additional, seen) : [])
     end
 
-    def default_for(rule)
+    def default_for(rule, ancestors = {})
       return copy(rule.default) if rule.default_set
 
       return unless [:object, :map].include?(rule.field&.type || :object)
+      return if ancestors[rule.object_id]
 
+      ancestors[rule.object_id] = true
       values = rule.children.each_with_object({}) do |child, result|
-        value = default_for(child)
+        value = default_for(child, ancestors)
         result[child.field.path.last] = value unless value.nil? && !child.default_set
       end
+      ancestors.delete(rule.object_id)
       values.empty? ? nil : values
     end
 

@@ -128,5 +128,32 @@ class SchemaTest < Minitest::Test
     assert_equal @schema.defaults, @schema.merge(Kochab.parse("[]"))
     assert_raises(TypeError) { @schema.describe("font_size") }
     assert_raises(FrozenError) { @schema.describe(["code_actions_on_save"]).default << "fix" }
+    assert_raises(TypeError) { Kochab::Schema.define { integer "n", minimum: "zero" } }
+    assert_raises(TypeError) { Kochab::Schema.define { string "x", deprecated: nil } }
+
+    description = +"Stable"
+    schema = Kochab::Schema.define { string "x", description: description }
+    description.replace("Changed")
+    assert_equal "Stable", schema.describe(["x"]).description
+    assert schema.describe(["x"]).description.frozen?
+  end
+
+  def test_json_schema_references_and_constraints_are_checked_at_compile_time
+    target = {"type" => "object", "properties" => {"count" => {"type" => "integer", "default" => 1}}}
+    schema = Kochab::Schema.from_json_schema({"$ref" => "#/$defs/root", "$defs" => {"root" => target}})
+    assert_equal({"count" => 1}, schema.defaults)
+
+    node = {"type" => "object", "properties" => {}}
+    node["properties"]["next"] = {"$ref" => "#/$defs/node"}
+    recursive = Kochab::Schema.from_json_schema({"type" => "object", "properties" => {"node" => node}, "$defs" => {"node" => node}})
+    assert_empty recursive.validate(Kochab.parse('{"node":{"next":{"next":{}}}}'))
+
+    assert_raises(TypeError) do
+      Kochab::Schema.from_json_schema({"type" => "object", "properties" => {"n" => {"type" => "integer", "minimum" => "zero"}}})
+    end
+    assert_raises(TypeError) { Kochab::Schema.from_json_schema({"type" => "object", "maxProperties" => -1}) }
+
+    looped = {"$ref" => "#/$defs/loop"}
+    assert_raises(ArgumentError) { Kochab::Schema.from_json_schema(looped.merge("$defs" => {"loop" => looped})) }
   end
 end

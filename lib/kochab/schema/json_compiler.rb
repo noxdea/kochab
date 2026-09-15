@@ -7,11 +7,38 @@ module Kochab
       def initialize(root)
         @root = root
         @active = {}
+        @resolving = {}
+      end
+
+      def compile_root
+        schema = @root
+        seen = {}
+        while schema.is_a?(Hash) && schema.key?("$ref")
+          raise ArgumentError, "Circular JSON Schema reference" if seen[schema.object_id]
+
+          seen[schema.object_id] = true
+          schema = reference(schema.fetch("$ref"))
+        end
+        raise TypeError, "JSON Schema entries must be Hash values" unless schema.is_a?(Hash)
+        raise ArgumentError, "JSON Schema root must be an object" unless infer_type(schema) == :object
+
+        compile(@root, [])
       end
 
       def compile(schema, path)
         raise TypeError, "JSON Schema entries must be Hash values" unless schema.is_a?(Hash)
-        return compile(reference(schema.fetch("$ref")), path) if schema.key?("$ref")
+        if schema.key?("$ref")
+          target = reference(schema.fetch("$ref"))
+          return @active[target.object_id] if @active.key?(target.object_id)
+          raise ArgumentError, "Circular JSON Schema reference" if @resolving[target.object_id]
+
+          @resolving[target.object_id] = true
+          begin
+            return compile(target, path)
+          ensure
+            @resolving.delete(target.object_id)
+          end
+        end
         return @active[schema.object_id] if @active.key?(schema.object_id)
 
         properties = schema.fetch("properties", {})
@@ -49,7 +76,8 @@ module Kochab
       def public_field(schema, path, type)
         items = schema["items"] && Schema.normalize_type(schema["items"]["type"] || :any)
         Field.new(path: Schema.frozen_copy(path), type: type, default: schema.key?("default") ? Schema.frozen_copy(schema["default"]) : nil,
-          description: schema["description"], enum: schema["enum"] && Schema.frozen_copy(schema["enum"]),
+          description: schema["description"] && Schema.frozen_copy(schema["description"]),
+          enum: schema["enum"] && Schema.frozen_copy(schema["enum"]),
           minimum: schema["minimum"], maximum: schema["maximum"], items: items,
           deprecated: schema.fetch("deprecated", false)).freeze
       end
@@ -81,6 +109,19 @@ module Kochab
         end
         unless [true, false].include?(schema.fetch("deprecated", false))
           raise TypeError, "JSON Schema deprecated must be true or false"
+        end
+        %w[minimum maximum exclusiveMinimum exclusiveMaximum].each do |name|
+          next unless schema.key?(name)
+
+          value = schema[name]
+          unless value.is_a?(Numeric) && (!value.respond_to?(:finite?) || value.finite?)
+            raise TypeError, "JSON Schema #{name} must be a finite Numeric"
+          end
+        end
+        %w[minItems maxItems minLength maxLength minProperties maxProperties].each do |name|
+          next unless schema.key?(name)
+
+          raise TypeError, "JSON Schema #{name} must be a nonnegative Integer" unless schema[name].is_a?(Integer) && schema[name] >= 0
         end
       end
 
