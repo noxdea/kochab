@@ -3,14 +3,19 @@ on:
   push:
     tags:
       - 'v*'
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   publish:
+    name: Publish gem
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
     permissions:
-      contents: write
-      id-token: write
+      contents: read # checkout
+      id-token: write # exchange GitHub OIDC for a short-lived RubyGems token
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -26,7 +31,7 @@ jobs:
       - name: Test and build
         run: | # zizmor: ignore[adhoc-packages]
           bundle exec rake
-          gem build kochab.gemspec --output kochab.gem
+          gem build --strict kochab.gemspec --output kochab.gem
           gem install --local kochab.gem --no-document
           ruby examples/settings.rb
       - name: Publish through RubyGems trusted publishing

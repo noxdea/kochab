@@ -4,9 +4,13 @@ on: [push, pull_request]
 
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    name: Ruby ${{ matrix.ruby }} on ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -22,11 +26,12 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
       - run: bundle exec rake test isolation
-      - run: gem build kochab.gemspec
-      - run: gem install ./kochab-0.1.0.gem --local --no-document # zizmor: ignore[adhoc-packages]
+      - run: gem build --strict kochab.gemspec
+      - run: gem install ./kochab-0.2.0.gem --local --no-document # zizmor: ignore[adhoc-packages]
       - run: ruby examples/settings.rb
 
   performance:
+    name: Performance budgets
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,6 +44,7 @@ jobs:
       - run: bundle exec rake bench:assert
 
   signatures:
+    name: RBS signatures
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
