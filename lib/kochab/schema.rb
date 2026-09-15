@@ -55,7 +55,7 @@ module Kochab
 
       def rule_for_type(type, path)
         type = normalize_type(type)
-        field = Field.new(path: path.freeze, type: type, default: nil, items: nil, deprecated: false).freeze
+        field = Field.new(path: frozen_copy(path), type: type, default: nil, items: nil, deprecated: false).freeze
         rule(field, type)
       end
 
@@ -65,6 +65,8 @@ module Kochab
         end
 
         normalized = type.is_a?(Array) ? type.map { |entry| normalize_type(entry) }.freeze : type.to_sym
+        raise ArgumentError, "Unsupported schema type #{type.inspect}" if normalized.is_a?(Array) && normalized.empty?
+
         valid = normalized.is_a?(Array) ? normalized.all? { |entry| TYPES.include?(entry) } : TYPES.include?(normalized)
         raise ArgumentError, "Unsupported schema type #{type.inspect}" unless valid
 

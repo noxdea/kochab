@@ -56,7 +56,12 @@ module Kochab
         value.each do |name, entry|
           next unless name.is_a?(String)
 
-          merged, valid = merge_value(result.fetch(name, UNSET), entry, rule.item)
+          previous_item = result.fetch(name, UNSET)
+          if previous_item.equal?(UNSET)
+            item_default = default_for(rule.item)
+            previous_item = item_default if rule.item.default_set || !item_default.nil?
+          end
+          merged, valid = merge_value(previous_item, entry, rule.item)
           result[name] = merged if valid
           changed ||= valid
         end

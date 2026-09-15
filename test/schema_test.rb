@@ -65,7 +65,7 @@ class SchemaTest < Minitest::Test
         "font_size": 16,
         "minimap": {"enabled": true, "width": 120},
         "code_actions_on_save": ["first"],
-        "languages": {"ruby": {"tab_size": 4}, "go": {"tab_size": 8}},
+        "languages": {"ruby": {"tab_size": 4}, "go": {"tab_size": 8}, "rust": {}},
         "extension": {"old": true}
       }
     JSONC
@@ -74,7 +74,7 @@ class SchemaTest < Minitest::Test
         "font_size": "large",
         "minimap": {"enabled": false, "width": 999},
         "code_actions_on_save": ["second"],
-        "languages": {"ruby": {"tab_size": 0}, "go": {"tab_size": 2}},
+        "languages": {"ruby": {"tab_size": 0}, "go": {"tab_size": 2}, "zig": {"tab_size": 0}},
         "extension": {"new": true}
       }
     JSONC
@@ -85,6 +85,8 @@ class SchemaTest < Minitest::Test
     assert_equal ["second"], result["code_actions_on_save"]
     assert_equal 4, result.dig("languages", "ruby", "tab_size")
     assert_equal 2, result.dig("languages", "go", "tab_size")
+    assert_equal 2, result.dig("languages", "rust", "tab_size")
+    assert_equal 2, result.dig("languages", "zig", "tab_size")
     assert_equal({"old" => true, "new" => true}, result["extension"])
   end
 

@@ -58,11 +58,11 @@ module Kochab
         path = field_path(name)
         raise ArgumentError, "Duplicate field #{path.join(".")}" if @rules.any? { |rule| rule.field.path == path }
 
-        field = Field.new(path: path.freeze, type: type, default: default.equal?(UNSET) ? nil : Schema.frozen_copy(default),
+        field = Field.new(path: Schema.frozen_copy(path), type: type, default: default.equal?(UNSET) ? nil : Schema.frozen_copy(default),
           description: description, enum: enum && Schema.frozen_copy(enum), minimum: minimum, maximum: maximum,
           items: items, deprecated: deprecated).freeze
         @rules << Schema.rule(field, type, children: children, item: item,
-          constraints: {minimum: minimum, maximum: maximum, enum: enum}, default_set: !default.equal?(UNSET))
+          constraints: {minimum: minimum, maximum: maximum, enum: field.enum}, default_set: !default.equal?(UNSET))
       end
 
       def field_path(name)

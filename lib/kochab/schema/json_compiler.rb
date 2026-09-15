@@ -21,6 +21,7 @@ module Kochab
         unless properties.keys.all? { |name| name.is_a?(String) } && required.all? { |name| name.is_a?(String) }
           raise TypeError, "JSON Schema property names must be Strings"
         end
+        validate_keywords(schema)
 
         type = infer_type(schema)
         field = path.empty? ? nil : public_field(schema, path, type)
@@ -46,8 +47,8 @@ module Kochab
       end
 
       def public_field(schema, path, type)
-        items = schema["items"] && (schema["items"]["type"]&.to_sym || :any)
-        Field.new(path: path.freeze, type: type, default: schema.key?("default") ? Schema.frozen_copy(schema["default"]) : nil,
+        items = schema["items"] && Schema.normalize_type(schema["items"]["type"] || :any)
+        Field.new(path: Schema.frozen_copy(path), type: type, default: schema.key?("default") ? Schema.frozen_copy(schema["default"]) : nil,
           description: schema["description"], enum: schema["enum"] && Schema.frozen_copy(schema["enum"]),
           minimum: schema["minimum"], maximum: schema["maximum"], items: items,
           deprecated: schema.fetch("deprecated", false)).freeze
@@ -63,11 +64,24 @@ module Kochab
       end
 
       def constraints(schema)
-        {enum: schema["enum"], minimum: schema["minimum"], maximum: schema["maximum"],
+        {enum: schema["enum"] && Schema.frozen_copy(schema["enum"]), minimum: schema["minimum"], maximum: schema["maximum"],
          exclusive_minimum: schema["exclusiveMinimum"], exclusive_maximum: schema["exclusiveMaximum"],
          min_items: schema["minItems"], max_items: schema["maxItems"],
          min_length: schema["minLength"], max_length: schema["maxLength"],
          min_properties: schema["minProperties"], max_properties: schema["maxProperties"]}
+      end
+
+      def validate_keywords(schema)
+        raise TypeError, "JSON Schema items must be a Hash" if schema.key?("items") && !schema["items"].is_a?(Hash)
+        unless !schema.key?("enum") || schema["enum"].is_a?(Array) && !schema["enum"].empty?
+          raise TypeError, "JSON Schema enum must be a nonempty Array"
+        end
+        if schema.key?("description") && !schema["description"].is_a?(String)
+          raise TypeError, "JSON Schema description must be a String"
+        end
+        unless [true, false].include?(schema.fetch("deprecated", false))
+          raise TypeError, "JSON Schema deprecated must be true or false"
+        end
       end
 
       def reference(pointer)
@@ -80,5 +94,6 @@ module Kochab
         raise ArgumentError, "Unknown JSON Schema reference #{pointer.inspect}"
       end
     end
+    private_constant :JsonCompiler
   end
 end
