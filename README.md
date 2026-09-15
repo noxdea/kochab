@@ -17,6 +17,7 @@
   <a href="#installation">Installation</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="#source-queries">Source Queries</a> ·
+  <a href="#schemas">Schemas</a> ·
   <a href="#editing">Editing</a> ·
   <a href="#development">Development</a>
 </p>
@@ -34,6 +35,7 @@ surrounding comments and formatting.
 - Error recovery with structured diagnostics and a strict JSON mode
 - Minimal insert, replace, and remove edits that preserve unrelated source text
 - Comment-preserving formatting
+- Typed settings schemas with source-aware diagnostics and safe layer merging
 - RBS signatures with no runtime gem dependencies
 
 ## Installation
@@ -110,6 +112,66 @@ Nodes expose `kind`, `range`, `key_range`, `value`, `children`,
 Property nodes have one value child; a missing value is a zero-length `:null`
 node. Containers' `value` fields contain their Ruby Hash or Array values.
 Treat the tree and its values as read-only snapshots. `doc.text` is frozen.
+
+## Schemas
+
+Define settings metadata once and use it for defaults, validation, layer
+merging, and settings UI generation:
+
+```ruby
+schema = Kochab::Schema.define do
+  boolean "format_on_save", default: false,
+    description: "Run the formatter when saving"
+  integer "font_size", default: 14, minimum: 6, maximum: 96
+  enum "theme", values: %w[auto light dark], default: "auto"
+  object "minimap" do
+    boolean "enabled", default: false
+    integer "width", default: 100, minimum: 20, maximum: 400
+  end
+  array "code_actions_on_save", items: :string, default: []
+  map "languages", value: ->(language) {
+    language.integer "tab_size", default: 2, minimum: 1
+  }
+end
+
+schema.defaults
+# {"format_on_save"=>false, "font_size"=>14, "theme"=>"auto",
+#  "minimap"=>{"enabled"=>false, "width"=>100},
+#  "code_actions_on_save"=>[]}
+
+document = Kochab.parse('{"font_size": 4, "theme": "blue"}')
+diagnostics = schema.validate(document)
+diagnostics.first.path                         # ["font_size"]
+document.text.byteslice(diagnostics.first.range) # "4"
+
+field = schema.describe(["minimap", "width"])
+field.type                                    # :integer
+schema.fields                                 # all metadata in definition order
+```
+
+Schema paths are arrays, like `Document` paths. Map metadata uses `"*"` in
+`Field#path`; `describe` accepts a concrete map key. Diagnostics have `path`,
+byte `range`, `severity` (`:error`), and `message`. Syntax diagnostics remain
+in `Document#errors`.
+
+`merge` starts with schema defaults and applies documents or Hash layers from
+left to right. Objects merge recursively and arrays replace earlier arrays.
+An invalid value is skipped at its own key, leaving the earlier valid value
+active; unrelated valid values in the same layer still apply. Fields not
+declared by the DSL are retained, which permits extension-owned settings.
+
+```ruby
+user = Kochab.parse('{"font_size": 18, "minimap": {"width": 120}}')
+project = Kochab.parse('{"font_size": "large", "minimap": {"enabled": true}}')
+values = schema.merge(user, project)
+values["font_size"]                    # 18; invalid project value was skipped
+values["minimap"]                      # {"enabled"=>true, "width"=>120}
+```
+
+`Schema.from_json_schema(hash)` imports the settings-oriented JSON Schema
+subset: local references, object properties, required names, array items,
+additional properties, primitive and nullable types, defaults, descriptions,
+deprecation, enums, numeric bounds, and collection/string size bounds.
 
 ## Parsing and Recovery
 
@@ -225,6 +287,8 @@ Measured on macOS arm64, Ruby 4.0.0 with YJIT (2026-09-09), seven-sample medians
 | Parse 1,048,594-byte JSONC | 157.5 ms | 200 ms |
 | Query `node_at` | < 1 µs | 10 µs |
 | Generate a `set` edit | 2 µs | 1 ms |
+| Validate a small schema document | 1 µs | 1 ms |
+| Merge a small schema document | 2 µs | 1 ms |
 
 The corpus contains nested settings, UTF-8 strings, and one comment per setting.
 Run `bench/benchmark.rb` on your deployment machine; these are measurements,

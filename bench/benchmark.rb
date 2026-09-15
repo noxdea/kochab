@@ -27,12 +27,18 @@ large = configuration(1024 * 1024)
 document = Kochab.parse(small)
 path = ["setting_100", "font"]
 offset = document.range_of(path).begin
+schema = Kochab::Schema.define do
+  map "settings", value: ->(setting) { setting.integer "size", minimum: 0 }
+end
+schema_document = Kochab.parse('{"settings":{"editor":{"size":14}}}')
 budget_scale = ENV["CI"] ? 3 : 1
 results = {
   "parse_10kb" => [median(20) { Kochab.parse(small) }, 0.002 * budget_scale],
   "parse_1mb" => [median(2) { Kochab.parse(large) }, 0.200 * budget_scale],
   "node_at" => [median(10_000) { document.node_at(offset) }, 0.000010 * budget_scale],
-  "set" => [median(2_000) { document.set(path, "Fira Code") }, 0.001 * budget_scale]
+  "set" => [median(2_000) { document.set(path, "Fira Code") }, 0.001 * budget_scale],
+  "schema_validate" => [median(2_000) { schema.validate(schema_document) }, 0.001 * budget_scale],
+  "schema_merge" => [median(2_000) { schema.merge(schema_document) }, 0.001 * budget_scale]
 }
 puts RUBY_DESCRIPTION
 puts "YJIT: #{defined?(RubyVM::YJIT) && RubyVM::YJIT.enabled?}; sources: #{small.bytesize}, #{large.bytesize} bytes"

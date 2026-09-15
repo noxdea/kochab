@@ -7,9 +7,9 @@ Gem::Specification.new do |spec|
   spec.version = Kochab::VERSION
   spec.authors = ["Yudai Takada"]
   spec.email = ["t.yudai92@gmail.com"]
-  spec.summary = "Recoverable JSONC parsing and edits that preserve comments and formatting"
+  spec.summary = "Source-aware JSONC parsing, editing, formatting, and schema validation"
   spec.description = "A Ruby JSONC parser with byte ranges, syntax recovery, source queries, " \
-    "minimal text edits, formatting, and UTF-16 positions. No runtime gem dependencies."
+    "minimal text edits, formatting, UTF-16 positions, and typed settings schemas. No runtime gem dependencies."
   spec.homepage = "https://github.com/noxdea/kochab"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1"

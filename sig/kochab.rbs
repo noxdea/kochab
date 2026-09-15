@@ -42,6 +42,27 @@ module Kochab
     def initialize: (?kind: Symbol, ?range: Range[Integer], ?key_range: Range[Integer]?, ?value: value, ?children: Array[Node], ?leading_comments: Array[Comment], ?trailing_comment: Comment?, ?key: (String | Integer)?, ?parent: Node?) -> void
   end
 
+  class Field < Struct[untyped]
+    attr_accessor path: path
+    attr_accessor type: (Symbol | Array[Symbol])
+    attr_accessor default: value
+    attr_accessor description: String?
+    attr_accessor enum: Array[value]?
+    attr_accessor minimum: Numeric?
+    attr_accessor maximum: Numeric?
+    attr_accessor items: untyped
+    attr_accessor deprecated: bool
+    def initialize: (?path: path, ?type: (Symbol | Array[Symbol]), ?default: value, ?description: String?, ?enum: Array[value]?, ?minimum: Numeric?, ?maximum: Numeric?, ?items: untyped, ?deprecated: bool) -> void
+  end
+
+  class Diagnostic < Struct[untyped]
+    attr_accessor path: path
+    attr_accessor range: Range[Integer]?
+    attr_accessor severity: Symbol
+    attr_accessor message: String
+    def initialize: (?path: path, ?range: Range[Integer]?, ?severity: Symbol, ?message: String) -> void
+  end
+
   class ParseError < StandardError
     attr_reader errors: Array[Error]
     def initialize: (Array[Error] errors) -> void
@@ -65,5 +86,26 @@ module Kochab
     def remove: (path path) -> Array[TextEdit]
     def insert: (path path, value value, ?after: String?) -> Array[TextEdit]
     def format: (?indent: Integer, ?keep_blank_lines: Integer) -> String
+  end
+
+  class Schema
+    def self.define: () { (Builder) -> void } -> Schema
+    def self.from_json_schema: (Hash[String, value] hash) -> Schema
+    def validate: (Document document) -> Array[Diagnostic]
+    def defaults: () -> Hash[String, value]
+    def merge: (*(Document | Hash[String, value]) documents) -> Hash[String, value]
+    def describe: (path path) -> Field?
+    def fields: () -> Array[Field]
+
+    class Builder
+      def boolean: (String name, ?default: value, ?description: String?, ?deprecated: bool) -> untyped
+      def integer: (String name, ?default: value, ?description: String?, ?minimum: Numeric?, ?maximum: Numeric?, ?deprecated: bool) -> untyped
+      def number: (String name, ?default: value, ?description: String?, ?minimum: Numeric?, ?maximum: Numeric?, ?deprecated: bool) -> untyped
+      def string: (String name, ?default: value, ?description: String?, ?deprecated: bool) -> untyped
+      def enum: (String name, values: Array[value], ?default: value, ?description: String?, ?deprecated: bool) -> untyped
+      def object: (String name, ?default: value, ?description: String?, ?deprecated: bool) { (Builder) -> void } -> untyped
+      def array: (String name, items: (Symbol | Array[Symbol]), ?default: value, ?description: String?, ?deprecated: bool) -> untyped
+      def map: (String name, value: (Symbol | ^(Builder) -> void), ?default: value, ?description: String?, ?deprecated: bool) -> untyped
+    end
   end
 end

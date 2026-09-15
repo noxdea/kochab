@@ -11,6 +11,9 @@ module Kochab
   TextEdit = Struct.new(:offset, :length, :text, keyword_init: true)
   Node = Struct.new(:kind, :range, :key_range, :value, :children,
     :leading_comments, :trailing_comment, :key, :parent, keyword_init: true)
+  Field = Struct.new(:path, :type, :default, :description, :enum, :minimum, :maximum,
+    :items, :deprecated, keyword_init: true)
+  Diagnostic = Struct.new(:path, :range, :severity, :message, keyword_init: true)
 
   class ParseError < StandardError
     attr_reader :errors
@@ -79,3 +82,4 @@ end
 require_relative "kochab/parser"
 require_relative "kochab/document"
 require_relative "kochab/editing"
+require_relative "kochab/schema"
